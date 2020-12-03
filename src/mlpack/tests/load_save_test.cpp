@@ -49,6 +49,56 @@ TEST_CASE("NotExistLoad", "[LoadSaveTest]")
 }
 
 /**
+ * Make sure load fails if the file extension is wrong in automatic detection mode.
+ */
+TEST_CASE("WrongExtensionWrongLoad", "[LoadSaveTest]")
+{
+  // Try to load arma::arma_binary file with ".csv" extension
+  arma::mat test = "1 5;"
+                   "2 6;"
+                   "3 7;"
+                   "4 8;";
+
+  arma::mat testTrans = trans(test);
+  REQUIRE(testTrans.quiet_save("test_file.csv", arma::arma_binary) == true);
+
+  // Now reload through our interface.
+  REQUIRE(data::Load("test_file.csv", test) == false);
+
+  // Remove the file.
+  remove("test_file.csv");
+}
+
+/**
+ * Make sure load is successful even if the file extension is wrong when file type is specified.
+ */
+TEST_CASE("WrongExtensionCorrectLoad", "[LoadSaveTest]")
+{
+  // Try to load arma::arma_binary file with ".csv" extension
+  arma::mat test = "1 5;"
+                   "2 6;"
+                   "3 7;"
+                   "4 8;";
+
+  arma::mat testTrans = trans(test);
+  REQUIRE(testTrans.quiet_save("test_file.csv", arma::arma_binary) == true);
+
+  // Now reload through our interface.
+  REQUIRE(
+      data::Load("test_file.csv", test, false, true, arma::arma_binary)
+      == true);
+
+  REQUIRE(test.n_rows == 4);
+  REQUIRE(test.n_cols == 2);
+
+  for (size_t i = 0; i < 8; i++)
+    REQUIRE(test[i] == Approx((double) (i + 1)).epsilon(1e-3));
+
+  // Remove the file.
+  remove("test_file.csv");
+}
+
+/**
  * Make sure a CSV is loaded correctly.
  */
 TEST_CASE("LoadCSVTest", "[LoadSaveTest]")
@@ -206,6 +256,32 @@ TEST_CASE("LoadTSVExtensionTest", "[LoadSaveTest]")
 }
 
 /**
+ * Test that we can manually specify the format for loading.
+ */
+TEST_CASE("LoadAnyExtensionFileTest", "[LoadSaveTest]")
+{
+  fstream f;
+  f.open("test_file.blah", fstream::out);
+
+  f << "1\t2\t3\t4" << endl;
+  f << "5\t6\t7\t8" << endl;
+
+  f.close();
+
+  arma::mat test;
+  REQUIRE(data::Load("test_file.blah", test, false, true, arma::raw_ascii));
+
+  REQUIRE(test.n_rows == 4);
+  REQUIRE(test.n_cols == 2);
+
+  for (size_t i = 0; i < 8; ++i)
+    REQUIRE(test[i] == Approx((double) (i + 1)).epsilon(1e-7));
+
+  // Remove the file.
+  remove("test_file.blah");
+}
+
+/**
  * Make sure a CSV is saved correctly.
  */
 TEST_CASE("SaveCSVTest", "[LoadSaveTest]")
@@ -267,7 +343,7 @@ TEST_CASE("SaveSparseTSVTest", "[LoadSaveTest]")
 }
 
 /**
- * Make sure a TSV is saved correctly for a sparse matrix
+ * Make sure a TXT is saved correctly for a sparse matrix
  */
 TEST_CASE("SaveSparseTXTTest", "[LoadSaveTest]")
 {
@@ -893,6 +969,32 @@ TEST_CASE("SaveArmaBinaryTest", "[LoadSaveTest]")
 }
 
 /**
+ * Make sure that we can manually specify the format.
+ */
+TEST_CASE("SaveArmaBinaryArbitraryExtensionTest", "[LoadSaveTest]")
+{
+  arma::mat test = "1 5;"
+                   "2 6;"
+                   "3 7;"
+                   "4 8;";
+
+  REQUIRE(data::Save("test_file.blerp.blah", test, false, true,
+      arma::arma_binary) == true);
+
+  REQUIRE(data::Load("test_file.blerp.blah", test, false, true,
+      arma::arma_binary) == true);
+
+  REQUIRE(test.n_rows == 4);
+  REQUIRE(test.n_cols == 2);
+
+  for (size_t i = 0; i < 8; ++i)
+    REQUIRE(test[i] == Approx((double) (i + 1)).epsilon(1e-7));
+
+  // Remove the file.
+  remove("test_file.blerp.blah");
+}
+
+/**
  * Make sure raw_binary is loaded correctly.
  */
 TEST_CASE("LoadRawBinaryTest", "[LoadSaveTest]")
@@ -1088,30 +1190,6 @@ TEST_CASE("SaveHDF5Test", "[LoadSaveTest]")
 #endif
 
 /**
- * Test one hot encoding.
- */
-TEST_CASE("OneHotEncodingTest", "[LoadSaveTest]")
-{
-  arma::Mat<size_t> matrix;
-  matrix = "1 0;"
-           "0 1;"
-           "1 0;"
-           "1 0;"
-           "1 0;"
-           "1 0;"
-           "0 1;"
-           "1 0;";
-// Output matrix to save onehotencoding results.
-  arma::Mat<size_t> output;
-  arma::irowvec labels("-1 1 -1 -1 -1 -1 1 -1");
-  data::OneHotEncoding(labels, output);
-
-  REQUIRE(matrix.n_cols == output.n_cols);
-  REQUIRE(matrix.n_rows == output.n_rows);
-  CheckMatrices(output, matrix);
-}
-
-/**
  * Test normalization of labels.
  */
 TEST_CASE("NormalizeLabelSmallDatasetTest", "[LoadSaveTest]")
@@ -1174,8 +1252,8 @@ class TestInner
   template<typename Archive>
   void serialize(Archive& ar, const unsigned int /* version */)
   {
-    ar & BOOST_SERIALIZATION_NVP(c);
-    ar & BOOST_SERIALIZATION_NVP(s);
+    ar(CEREAL_NVP(c));
+    ar(CEREAL_NVP(s));
   }
 
   // Public members for testing.
@@ -1191,10 +1269,10 @@ class Test
   template<typename Archive>
   void serialize(Archive& ar, const unsigned int /* version */)
   {
-    ar & BOOST_SERIALIZATION_NVP(x);
-    ar & BOOST_SERIALIZATION_NVP(y);
-    ar & BOOST_SERIALIZATION_NVP(ina);
-    ar & BOOST_SERIALIZATION_NVP(inb);
+    ar(CEREAL_NVP(x));
+    ar(CEREAL_NVP(y));
+    ar(CEREAL_NVP(ina));
+    ar(CEREAL_NVP(inb));
   }
 
   // Public members for testing.
@@ -1251,16 +1329,16 @@ TEST_CASE("LoadXMLTest", "[LoadSaveTest]")
 /**
  * Make sure we can load and save.
  */
-TEST_CASE("LoadTextTest", "[LoadSaveTest]")
+TEST_CASE("LoadJsonTest", "[LoadSaveTest]")
 {
   Test x(10, 12);
 
-  REQUIRE(data::Save("test.txt", "x", x, false) == true);
+  REQUIRE(data::Save("test.json", "x", x, false) == true);
 
   // Now reload.
   Test y(11, 14);
 
-  REQUIRE(data::Load("test.txt", "x", y, false) == true);
+  REQUIRE(data::Load("test.json", "x", y, false) == true);
 
   REQUIRE(y.x == x.x);
   REQUIRE(y.y == x.y);

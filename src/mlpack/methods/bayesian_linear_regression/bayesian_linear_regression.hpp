@@ -5,6 +5,11 @@
  * Definition of the BayesianRidge class, which performs the
  * bayesian linear regression. According to the armadillo standards,
  * all the functions consider data in column-major format.
+ *
+ * mlpack is free software; you may redistribute it and/or modify it under the
+ * terms of the 3-clause BSD license.  You should have received a copy of the
+ * 3-clause BSD license along with mlpack.  If not, see
+ * http://www.opensource.org/licenses/BSD-3-Clause for more information.
 **/
 
 #ifndef MLPACK_METHODS_BAYESIAN_LINEAR_REGRESSION_HPP
@@ -213,7 +218,7 @@ class BayesianLinearRegression
    * Serialize the BayesianLinearRegression model.
    **/
   template<typename Archive>
-  void serialize(Archive& ar, const unsigned int /* version */);
+  void serialize(Archive& ar, const uint32_t version);
 
  private:
   //! Center the data if true.
